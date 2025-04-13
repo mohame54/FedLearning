@@ -1,0 +1,37 @@
+dataset_folder_pth: /content/drive/MyDrive/data_processed/pems4
+num_clients: 2
+train_batch_size: 64
+val_batch_size: 32
+seed: 0
+loader_kwargs:
+  shuffle: true
+  pin_memory: true
+
+adj_file_pth: /content/drive/MyDrive/data_processed/pems4/adj_mets.npz
+
+model_config:
+  num_nodes: 307
+ 
+config_fit:
+  optim_type: adam
+  optimizer_kwargs:
+    lr: 0.00001
+
+  mixed_pre: true  
+  max_norm: 1.0 
+  #results:
+  #  pth: "results/results.json"
+  #  test_pth: "results/results_test.json"
+
+  norm_params_pth: /content/drive/MyDrive/data_processed/pems4/norms.npz  # path to the normalization parameters file (.npz)
+  epochs: 5
+  grad_accum: 1
+
+frac_fit: 0.01
+frac_eval: 0.01
+num_fit_clients: 2
+num_eval_clients: 2
+num_rounds: 10
+resources:
+  num_cpus: 1
+  num_gpus: 1
