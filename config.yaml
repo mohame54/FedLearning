@@ -15,10 +15,12 @@ model_config:
 config_fit:
   optim_type: adam
   optimizer_kwargs:
-    lr: 0.00001
+    lr: 0.0001
 
   mixed_pre: true  
   max_norm: 1.0 
+  is_prox: true
+  mu: 0.01
   #results:
   #  pth: "results/results.json"
   #  test_pth: "results/results_test.json"
@@ -29,6 +31,7 @@ config_fit:
 
 frac_fit: 0.01
 frac_eval: 0.01
+
 num_fit_clients: 2
 num_eval_clients: 2
 num_rounds: 10

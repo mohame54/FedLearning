@@ -1,6 +1,6 @@
 from client import GWNETClient
 from utils import DataCalss, prepare_data, get_adj_mets, write_json
-from strategies.feds import FedAvg
+from strategies.feds import FedAvg, FedProx, FedNova
 
 config = DataCalss.from_yaml_file("config.yaml")
 
@@ -20,7 +20,7 @@ clients = [GWNETClient(partition_id=i, adj_met=adj, model_config=config.model_co
 
 # Initialize the strategy (FedAvg)
 
-fed_avg_strategy = FedAvg(clients, config.config_fit.as_dict())
+fed_avg_strategy = FedAvg(clients, config.config_fit.as_dict()) # 
 result_path = config.config_fit.results.test_pth
 data = {"train":[], "val":[]}
 

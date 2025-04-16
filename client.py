@@ -63,6 +63,8 @@ class GWNETClient:#(fl.client.NumPyClient):
                     max_norm=max_norm,
                     grad_accumelation=config['grad_accum'],
                     norms_params=norm_params,
+                    prox_obj=config['is_prox'],
+                    mu=config['mu']
                 )
                 if result_json is not None:
                     met_json = load_json(result_json['pth'])

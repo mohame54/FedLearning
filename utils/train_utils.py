@@ -32,6 +32,12 @@ def set_parameters(net, parameters):
   net.load_state_dict(parameters, strict=True)
 
 
+def prox_obj(model, global_params, mu=0.01):
+    prox_term = 0.0
+    for name, param in model.named_parameters():
+        prox_term += ((param - global_params[name]) ** 2).sum()
+    return (mu / 2) * prox_term
+   
 
 def train_epoch(
     model,
@@ -42,6 +48,8 @@ def train_epoch(
     max_norm=None,
     grad_accumelation=1,
     norms_params=None,
+    mu=0.01,
+    prox_obj=False
  
 ):
       model.train()
@@ -51,6 +59,8 @@ def train_epoch(
       loop = tqdm(train_ds, desc="Training loop")
       loss_accum = 0.0
       opt.zero_grad()
+      if prox_obj:
+          global_params = {name: param.clone().detach() for name, param in model.named_parameters()}
       for i, (rec, day, week, targets) in enumerate(loop):
           rec, day, week = rec.to(device), day.to(device), week.to(device)
           targets = targets.to(device)
@@ -58,12 +68,17 @@ def train_epoch(
             with torch.autocast(device_type='cuda', dtype=torch.float16):
                 pred = model(rec, day, week)
                 loss = mae_loss(pred, targets)
+                if prox_obj:
+                  loss = loss + prox_obj(model, global_params, mu=mu)
             loss = loss / grad_accumelation
             scaler.scale(loss).backward()
           else:
               pred = model(rec, day, week)
               loss = mae_loss(pred, targets)
+              if prox_obj:
+                  loss = loss + prox_obj(model, global_params, mu=mu)
               loss = loss / grad_accumelation
+              
               loss.backward()
           all_preds.append(pred.cpu())
           all_tars.append(targets.cpu())
