@@ -89,7 +89,8 @@ class FedProx(BaseFedStrategy):
         for param_name in client_parameters[0].keys():
             aggregated_params[param_name] = torch.zeros_like(client_parameters[0][param_name])
             for client_params, size in zip(client_parameters, client_sizes):
-                aggregated_params[param_name] += (client_params[param_name] * size / total_size)
+                param = aggregated_params[param_name]
+                aggregated_params[param_name] = param +  (client_params[param_name] * torch.tensor(size / total_size, device=param.device, dtype=param.dtype))
         
         return aggregated_params
     
@@ -152,6 +153,7 @@ class FedNova(BaseFedStrategy):
         # Collect updates and metadata from clients
         for client in self.clients:
             client_params = client.get_parameters(self.config)
+            client_params = {k:v.to("cpu") for k, v in client_params.items()}
             client_size = len(client.train_loader)
             local_epochs = self.config.get('epochs', 1)
             steps = local_epochs * len(client.train_loader)
@@ -173,7 +175,7 @@ class FedNova(BaseFedStrategy):
 
         # Aggregate: Δw = ∑ (n_k / n_total) * (g_k / τ_k)
         for update, size, steps in zip(client_updates, client_sizes, client_steps):
-            weight = size / total_size
+            weight = torch.tensor(size / total_size)
             for k in aggregated_update:
                 aggregated_update[k] += weight * (update[k] / steps)
 
