@@ -162,7 +162,7 @@ class FedNova(BaseFedStrategy):
             client_steps.append(steps)
 
             # Calculate delta: (w_k - w_t)
-            delta = {k: (client_params[k] - global_params[k]) for k in global_params}
+            delta = {k: (client_params[k].to("cpu") - global_params[k]) for k in global_params}
             # g_k = tau_k * (w_k - w_t)
             scaled_delta = {k: v * steps for k, v in delta.items()}
 

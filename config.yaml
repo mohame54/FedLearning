@@ -29,6 +29,7 @@ config_fit:
   epochs: 5
   grad_accum: 1
 
+is_prox: true
 frac_fit: 0.01
 frac_eval: 0.01
 
