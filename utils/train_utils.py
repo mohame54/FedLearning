@@ -49,7 +49,7 @@ def train_epoch(
     grad_accumelation=1,
     norms_params=None,
     mu=0.01,
-    prox_obj=False
+    is_prox=False
  
 ):
       model.train()
@@ -59,8 +59,8 @@ def train_epoch(
       loop = tqdm(train_ds, desc="Training loop")
       loss_accum = 0.0
       opt.zero_grad()
-      if prox_obj:
-          global_params = {name: param.clone().detach() for name, param in model.named_parameters()}
+      if is_prox:
+          global_params = {name: param.clone().detach().to(device) for name, param in model.named_parameters()}
       for i, (rec, day, week, targets) in enumerate(loop):
           rec, day, week = rec.to(device), day.to(device), week.to(device)
           targets = targets.to(device)
@@ -68,14 +68,14 @@ def train_epoch(
             with torch.autocast(device_type='cuda', dtype=torch.float16):
                 pred = model(rec, day, week)
                 loss = mae_loss(pred, targets)
-                if prox_obj:
+                if is_prox:
                   loss = loss + prox_obj(model, global_params, mu=mu)
             loss = loss / grad_accumelation
             scaler.scale(loss).backward()
           else:
               pred = model(rec, day, week)
               loss = mae_loss(pred, targets)
-              if prox_obj:
+              if is_prox:
                   loss = loss + prox_obj(model, global_params, mu=mu)
               loss = loss / grad_accumelation
               

@@ -63,8 +63,8 @@ class GWNETClient:#(fl.client.NumPyClient):
                     max_norm=max_norm,
                     grad_accumelation=config['grad_accum'],
                     norms_params=norm_params,
-                    prox_obj=config['is_prox'],
-                    mu=config['mu']
+                    mu=config['mu'],
+                    is_prox=config['is_prox']
                 )
                 if result_json is not None:
                     met_json = load_json(result_json['pth'])
@@ -79,7 +79,8 @@ class GWNETClient:#(fl.client.NumPyClient):
             return self.get_parameters(self.model), len(self.train_loader), {}
        except Exception as e:
             print(f"[Client {self.partition_id}] ❌ Fit failed: {e}")
-            return parameters, 0, {"error": str(e)}
+            raise
+            #return parameters, 0, {"error": str(e)}
            
     
     def evaluate(self, parameters, config):
