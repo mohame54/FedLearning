@@ -177,7 +177,7 @@ class FedNova(BaseFedStrategy):
         for update, size, steps in zip(client_updates, client_sizes, client_steps):
             weight = torch.tensor(size / total_size)
             for k in aggregated_update:
-                aggregated_update[k] += weight * (update[k] / steps)
+                aggregated_update[k] = aggregated_update[k] + weight * (update[k] / steps)
 
         # Update global model
         new_global_params = {
