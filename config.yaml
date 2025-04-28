@@ -16,7 +16,7 @@ config_fit:
   optim_type: adam
   optimizer_kwargs:
     lr: 0.0001
-
+  
   mixed_pre: true  
   max_norm: 1.0 
   is_prox: true
@@ -26,8 +26,17 @@ config_fit:
   #  test_pth: "results/results_test.json"
 
   norm_params_pth: /content/drive/MyDrive/data_processed/pems4/norms.npz  # path to the normalization parameters file (.npz)
-  epochs: 5
+  epochs: 3 # overfitting
   grad_accum: 1
+  fedadam_config:
+     lr: 0.001
+     beta1: 0.9
+     beta2: 0.999
+     epsilon: 1e-5
+     v0: 0.0
+  fedavgm_config:
+    lr: 0.01
+    momentum: 0.9
 
 is_prox: true
 frac_fit: 0.01
@@ -35,7 +44,10 @@ frac_eval: 0.01
 
 num_fit_clients: 2
 num_eval_clients: 2
-num_rounds: 10
+num_rounds: 15
 resources:
   num_cpus: 1
   num_gpus: 1
+
+aggregation_algorithm: "FedAvg" # FedAvg, FedAdam, FedAvgM, FedNova, FedProx
+results_save_pth: "results/results_avg.json"

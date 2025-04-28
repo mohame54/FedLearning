@@ -1,7 +1,4 @@
 import torch
-import torch
-import numpy as np
-from collections import defaultdict
 from .base import BaseFedStrategy
 
 
@@ -27,48 +24,6 @@ class FedAvg(BaseFedStrategy):
         
         return aggregated_params
 
-    def fit(self):
-        global_params = self.aggregate_parameters()
-
-        # Set global parameters to each client
-        for client in self.clients:
-            client.set_parameters(global_params)
-
-        # Train each client
-        fit_results = []
-        for client in self.clients:
-            fit_results.append(client.fit(global_params, self.config))
-
-        # Aggregate the results
-        aggregated_metrics = defaultdict(list)
-        for result in fit_results:
-            train_metrics = result[2]
-            for met in train_metrics:
-                aggregated_metrics[met].append(np.mean(train_metrics[met]))
-
-        return aggregated_metrics
-
-    def evaluate(self):
-        global_params = self.aggregate_parameters()
-
-
-        # Set global parameters to each client
-        for client in self.clients:
-            client.set_parameters(global_params)
-
-        # Evaluate each client
-        eval_results = []
-        for client in self.clients:
-            eval_results.append(client.evaluate(global_params, self.config))
-
-        # Aggregate the results (validation metrics)
-        aggregated_metrics = defaultdict(list)
-        for result in eval_results:
-            val_metrics = result[2]
-            for met in val_metrics:
-                aggregated_metrics[met].append(np.mean(val_metrics[met]))
-
-        return aggregated_metrics
 
 
 class FedProx(BaseFedStrategy):
@@ -94,49 +49,6 @@ class FedProx(BaseFedStrategy):
         
         return aggregated_params
     
-    def fit(self):
-        global_params = self.aggregate_parameters()
-        
-        # Set global parameters to each client
-        for client in self.clients:
-            client.set_parameters(global_params)
-        
-        # Train each client with proximal term
-        fit_results = []
-
-        fit_results = []
-        for client in self.clients:
-            fit_results.append(client.fit(global_params, self.config))
-
-        # Aggregate the results
-        aggregated_metrics = defaultdict(list)
-        for result in fit_results:
-            train_metrics = result[2]
-            for met in train_metrics:
-                aggregated_metrics[met].append(np.mean(train_metrics[met]))
-        
-        return aggregated_metrics
-    
-    def evaluate(self):
-        global_params = self.aggregate_parameters()
-        
-        # Set global parameters to each client
-        for client in self.clients:
-            client.set_parameters(global_params)
-        
-        # Evaluate each client
-        eval_results = []
-        for client in self.clients:
-            eval_results.append(client.evaluate(global_params, self.config))
-        
-        # Aggregate the results (validation metrics)
-        aggregated_metrics = defaultdict(list)
-        for result in eval_results:
-            val_metrics = result[2]
-            for met in val_metrics:
-                aggregated_metrics[met].append(np.mean(val_metrics[met]))
-        
-        return aggregated_metrics
 
 
 class FedNova(BaseFedStrategy):
@@ -186,47 +98,107 @@ class FedNova(BaseFedStrategy):
 
         return new_global_params
     
-    def fit(self):
-        global_params = self.global_model.state_dict()
-        
-        # Set global parameters to each client
+
+class FedAdam(BaseFedStrategy):
+    def __init__(self, clients, config):
+        super().__init__(clients, config)
+
+        # Parse FedAdam-specific optimizer config
+        fedadam_cfg = config.get("fedadam_config", {})
+        self.lr = fedadam_cfg.get("lr", 0.001)
+        self.betas = (fedadam_cfg.get("beta1", 0.9), fedadam_cfg.get("beta2", 0.999))
+        self.tau = float(fedadam_cfg.get("epsilon", 1e-8))
+        self.v0 = fedadam_cfg.get("v0", 0.0)
+
+        self.m = {}  # First moment estimate
+        self.v = {}  # Second moment estimate
+
+    def aggregate_parameters(self):
+        client_parameters = []
+        client_sizes = []
+
         for client in self.clients:
-            client.set_parameters(global_params)
+            client_parameters.append(client.get_parameters(self.config))
+            client_sizes.append(len(client.train_loader))
+
+        total_size = sum(client_sizes)
+        aggregated_deltas = {}
+
+        # Use first client's parameters as reference (for global params)
+        global_params = self.clients[0].model.state_dict()
+
+        for param_name in client_parameters[0].keys():
+            delta = torch.zeros_like(client_parameters[0][param_name])
+            if delta.dtype in [torch.int32, torch.int64]:
+                delta = delta.float()
+            global_param = self.clients[0].model.state_dict()[param_name]
+
+            # Aggregate deltas weighted by client data size
+            for client_params, size in zip(client_parameters, client_sizes):
+                local_param = client_params[param_name]
+                delta += (local_param - global_param) * (size / total_size)
+
+            # Initialize m and v
+            if param_name not in self.m:
+                self.m[param_name] = torch.zeros_like(delta)
+                self.v[param_name] = self.v0 * self.betas[1] + (1 - self.betas[1]) * delta.pow(2)
+
+            # Update biased first moment estimate
+            self.m[param_name] = self.betas[0] * self.m[param_name] + (1 - self.betas[0]) * delta
+
+            # Update biased second raw moment estimate
+            self.v[param_name] = self.betas[1] * self.v[param_name] + (1 - self.betas[1]) * delta.pow(2)
+
+            # Apply FedAdam update rule
+            adaptive_update = self.lr * self.m[param_name] / (self.v[param_name].sqrt() + self.tau)
+            aggregated_deltas[param_name] = global_params[param_name] + adaptive_update
+
+        return aggregated_deltas
+
+
+class FedAvgM(BaseFedStrategy):
+    def __init__(self, clients, config):
+        super().__init__(clients, config)
+        fedavgm_cfg = config.get("fedavgm_config", {})
+        self.lr = fedavgm_cfg.get("lr", 0.01)
+        self.server_momentum = fedavgm_cfg.get("momentum", 0.9)
         
-        # Train each client
-        fit_results = []
+        self.velocity = {}
+
+    def aggregate_parameters(self):
+        client_parameters = []
+        client_sizes = []
+
         for client in self.clients:
-            fit_results.append(client.fit(global_params, self.config))
-        
-        # Update global model with FedNova
-        self.update_global_model()
-        
-        # Aggregate the results
-        aggregated_metrics = defaultdict(list)
-        for result in fit_results:
-            train_metrics = result[2]
-            for met in train_metrics:
-                aggregated_metrics[met].append(np.mean(train_metrics[met]))
-        
-        return aggregated_metrics
-    
-    def evaluate(self):
-        global_params = self.global_model.state_dict()
-        
-        # Set global parameters to each client
-        for client in self.clients:
-            client.set_parameters(global_params)
-        
-        # Evaluate each client
-        eval_results = []
-        for client in self.clients:
-            eval_results.append(client.evaluate(global_params, self.config))
-        
-        # Aggregate the results (validation metrics)
-        aggregated_metrics = defaultdict(list)
-        for result in eval_results:
-            val_metrics = result[2]
-            for met in val_metrics:
-                aggregated_metrics[met].append(np.mean(val_metrics[met]))
-        
-        return aggregated_metrics
+            client_parameters.append(client.get_parameters(self.config))
+            client_sizes.append(len(client.train_loader))
+
+        total_size = sum(client_sizes)
+        aggregated_deltas = {}
+
+        # Use first client's parameters as reference (for global params)
+        global_params = self.clients[0].model.state_dict()
+
+        for param_name in client_parameters[0].keys():
+            delta = torch.zeros_like(client_parameters[0][param_name])
+            if delta.dtype in [torch.int32, torch.int64]:
+                delta = delta.float()
+
+            # Aggregate deltas weighted by client data size
+            for client_params, size in zip(client_parameters, client_sizes):
+                local_param = client_params[param_name]
+                delta += (local_param - global_params[param_name]) * (size / total_size)
+
+            # Initialize velocity if not present
+            if param_name not in self.velocity:
+                self.velocity[param_name] = torch.zeros_like(delta)
+
+            # Update velocity with momentum
+            self.velocity[param_name] = (self.server_momentum * self.velocity[param_name] + 
+                                        delta)
+            
+            # Apply update with learning rate
+            aggregated_deltas[param_name] = (global_params[param_name] + 
+                                            self.lr * self.velocity[param_name])
+
+        return aggregated_deltas

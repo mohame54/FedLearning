@@ -4,7 +4,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 @dataclass
 class GWNETConfig:
      num_nodes: int = 883

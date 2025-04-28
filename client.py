@@ -76,7 +76,7 @@ class GWNETClient:#(fl.client.NumPyClient):
                 print("-"*50)
             
             self.model = self.model.to("cpu")
-            return self.get_parameters(self.model), len(self.train_loader), {}
+            return self.get_parameters(self.model), len(self.train_loader), train_mets
        except Exception as e:
             print(f"[Client {self.partition_id}] ❌ Fit failed: {e}")
             raise
